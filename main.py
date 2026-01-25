@@ -1,4 +1,5 @@
 # main.py
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -8,10 +9,9 @@ from starlette.requests import Request
 import cv2
 import threading
 import time
-import numpy as np
 
-# ✅ Import your overlay drawer
-from pose_overlay import draw_pose_on_frame, IDX
+from pose_tasks import PoseTasksLandmarker, PoseTasksConfig, draw_pose_landmarks_on_frame
+
 
 app = FastAPI(title="FastAPI Website Boilerplate")
 
@@ -21,10 +21,7 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "title": "Home"},
-    )
+    return templates.TemplateResponse("index.html", {"request": request, "title": "Home"})
 
 
 @app.get("/health")
@@ -32,20 +29,18 @@ def health():
     return {"ok": True}
 
 
-# -----------------------
-# OpenCV camera streamer
-# -----------------------
-
 class Camera:
     def __init__(self, src: int = 0):
         self.cap = cv2.VideoCapture(src)
         if not self.cap.isOpened():
-            raise RuntimeError("Could not open camera.")
+            raise RuntimeError("Could not open camera/video source.")
+
+        # Pose landmarker (Tasks API)
+        self.pose = PoseTasksLandmarker(PoseTasksConfig(model_path="pose_landmarker_full.task"))
 
         self.lock = threading.Lock()
         self.latest_jpeg = None
         self.running = True
-
         threading.Thread(target=self._reader_loop, daemon=True).start()
 
     def _reader_loop(self):
@@ -55,20 +50,10 @@ class Camera:
                 time.sleep(0.05)
                 continue
 
-            # For demo purposes, create fake keypoints
-            h, w = frame.shape[:2]
-            keypoints = np.zeros((17, 3), dtype=np.float32)
-            keypoints[:, 2] = 1.0  # confidence = 1
-
-            keypoints[IDX["nose"]] = (w * 0.5, h * 0.2, 1)
-            keypoints[IDX["left_shoulder"]] = (w * 0.43, h * 0.35, 1)
-            keypoints[IDX["right_shoulder"]] = (w * 0.57, h * 0.35, 1)
-            keypoints[IDX["left_hip"]] = (w * 0.46, h * 0.60, 1)
-            keypoints[IDX["right_hip"]] = (w * 0.54, h * 0.60, 1)
-            keypoints[IDX["left_knee"]] = (w * 0.47, h * 0.80, 1)
-            keypoints[IDX["right_knee"]] = (w * 0.53, h * 0.80, 1)
-
-            frame = draw_pose_on_frame(frame, keypoints)
+            # ---- Pose detect + draw on the camera frame ----
+            landmarks = self.pose.detect_bgr(frame)
+            if landmarks is not None:
+                draw_pose_landmarks_on_frame(frame, landmarks, min_visibility=0.5)
 
             ok, buf = cv2.imencode(".jpg", frame)
             if ok:
@@ -83,7 +68,10 @@ class Camera:
 
     def close(self):
         self.running = False
-        self.cap.release()
+        try:
+            self.cap.release()
+        except Exception:
+            pass
 
 
 camera = None
@@ -92,28 +80,24 @@ camera = None
 @app.on_event("startup")
 def startup():
     global camera
-    camera = Camera(0)
+    camera = Camera(src=0)  # if Codespaces, use a video file path instead of 0
 
 
 @app.on_event("shutdown")
 def shutdown():
+    global camera
     if camera:
         camera.close()
+        camera = None
 
 
 def mjpeg_generator():
     while True:
-        frame = camera.get_jpeg()
+        frame = camera.get_jpeg() if camera else None
         if frame is None:
             time.sleep(0.01)
             continue
-
-        yield (
-            b"--frame\r\n"
-            b"Content-Type: image/jpeg\r\n\r\n"
-            + frame
-            + b"\r\n"
-        )
+        yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
 
 
 @app.get("/video")

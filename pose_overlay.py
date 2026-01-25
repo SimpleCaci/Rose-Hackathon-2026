@@ -1,127 +1,100 @@
-# pose_overlay.py
-# Simple, readable OpenCV overlay for drawing pose joints + skeleton directly onto camera frames.
+# pose_tasks.py
+# MediaPipe Tasks Pose Landmarker (NOT mp.solutions.*) + OpenCV drawing utilities.
+# Works with: mediapipe>=0.10.x (Tasks API), opencv-python(-headless), numpy
 
 from __future__ import annotations
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from dataclasses import dataclass
+from typing import Optional, Tuple, List
+
 import cv2
 import numpy as np
 
-# COCO / YOLO-Pose (17 keypoints) naming
-JOINTS: List[str] = [
-    "nose",
-    "left_eye", "right_eye",
-    "left_ear", "right_ear",
-    "left_shoulder", "right_shoulder",
-    "left_elbow", "right_elbow",
-    "left_wrist", "right_wrist",
-    "left_hip", "right_hip",
-    "left_knee", "right_knee",
-    "left_ankle", "right_ankle",
-]
-
-IDX: Dict[str, int] = {name: i for i, name in enumerate(JOINTS)}
-
-# Pairs of joints to connect with lines
-SKELETON: List[Tuple[str, str]] = [
-    ("nose", "left_eye"), ("nose", "right_eye"),
-    ("left_eye", "left_ear"), ("right_eye", "right_ear"),
-
-    ("left_shoulder", "right_shoulder"),
-    ("left_shoulder", "left_elbow"), ("left_elbow", "left_wrist"),
-    ("right_shoulder", "right_elbow"), ("right_elbow", "right_wrist"),
-
-    ("left_shoulder", "left_hip"), ("right_shoulder", "right_hip"),
-    ("left_hip", "right_hip"),
-
-    ("left_hip", "left_knee"), ("left_knee", "left_ankle"),
-    ("right_hip", "right_knee"), ("right_knee", "right_ankle"),
-]
-
-# Input keypoint formats we accept:
-# - numpy array/list shape (17,3): (x,y,conf)
-# - numpy array/list shape (17,2): (x,y) (assumes conf=1.0)
-# - dict: {"left_knee": (x,y,conf), ...}
-Keypoints = Union[np.ndarray, Sequence[Sequence[float]], Dict[str, Tuple[float, ...]]]
+import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 
 
-def _normalize_keypoints(kps: Keypoints) -> np.ndarray:
+@dataclass
+class PoseTasksConfig:
+    model_path: str = "pose_landmarker_full.task"  # download this file (see notes below)
+    # 0=most accurate/slowest, 4=fastest/least accurate (varies by model)
+    num_poses: int = 1
+    min_pose_detection_confidence: float = 0.5
+    min_pose_presence_confidence: float = 0.5
+    min_tracking_confidence: float = 0.5
+
+
+class PoseTasksLandmarker:
     """
-    Return a (17,3) array: [x, y, conf] in pixel coordinates.
-    Missing/conf=0 joints will be ignored by the draw function.
+    Wrapper around MediaPipe Tasks PoseLandmarker for video frames.
+    Use `detect_bgr(frame_bgr)` -> returns a list of 33 landmarks (x,y,z,visibility) normalized [0..1].
     """
-    if isinstance(kps, dict):
-        arr = np.zeros((len(JOINTS), 3), dtype=np.float32)
-        for name, val in kps.items():
-            if name not in IDX:
-                continue
-            i = IDX[name]
-            if len(val) == 2:
-                x, y = val
-                c = 1.0
-            else:
-                x, y, c = val[0], val[1], val[2]
-            arr[i] = (float(x), float(y), float(c))
-        return arr
 
-    arr = np.asarray(kps, dtype=np.float32)
+    def __init__(self, cfg: PoseTasksConfig):
+        base_options = python.BaseOptions(model_asset_path=cfg.model_path)
+        options = vision.PoseLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.VIDEO,
+            num_poses=cfg.num_poses,
+            min_pose_detection_confidence=cfg.min_pose_detection_confidence,
+            min_pose_presence_confidence=cfg.min_pose_presence_confidence,
+            min_tracking_confidence=cfg.min_tracking_confidence,
+        )
+        self._landmarker = vision.PoseLandmarker.create_from_options(options)
+        self._timestamp_ms = 0
 
-    if arr.shape == (len(JOINTS), 2):
-        conf = np.ones((len(JOINTS), 1), dtype=np.float32)
-        return np.concatenate([arr, conf], axis=1)
+    def detect_bgr(self, frame_bgr: np.ndarray) -> Optional[List[mp.framework.formats.landmark_pb2.NormalizedLandmark]]:
+        """
+        Returns landmarks for the first detected pose (list length 33), or None if no pose found.
+        """
+        # MediaPipe Tasks expects RGB
+        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
 
-    if arr.shape == (len(JOINTS), 3):
-        return arr
+        # Timestamp must increase for VIDEO mode
+        self._timestamp_ms += 33  # ~30fps
+        result = self._landmarker.detect_for_video(mp_image, self._timestamp_ms)
 
-    raise ValueError(f"Expected (17,2), (17,3), or dict; got {arr.shape}.")
+        if not result.pose_landmarks:
+            return None
+        return result.pose_landmarks[0]  # first person
 
 
-def draw_pose_on_frame(
-    frame: np.ndarray,
-    keypoints: Keypoints,
+# ---- Drawing ----
+
+# Use MediaPipe's built-in pose connections (33-landmark skeleton)
+POSE_CONNECTIONS = mp.solutions.pose.POSE_CONNECTIONS  # just a constant; doesn't require mp.solutions Pose runtime
+
+def draw_pose_landmarks_on_frame(
+    frame_bgr: np.ndarray,
+    landmarks: List[mp.framework.formats.landmark_pb2.NormalizedLandmark],
     *,
-    min_conf: float = 0.3,
-    draw_names: bool = False,
+    min_visibility: float = 0.5,
 ) -> np.ndarray:
     """
-    Draw a pose (joints + skeleton) directly onto the given camera frame.
-
-    - frame: the image from your camera (BGR)
-    - keypoints: (17,3) or (17,2) in pixel coordinates (x,y[,conf])
-    - min_conf: hide low-confidence joints/limbs
+    Draw 33 landmarks + skeleton onto the camera frame (in-place, returns same frame).
     """
-    kps = _normalize_keypoints(keypoints)
-    h, w = frame.shape[:2]
+    h, w = frame_bgr.shape[:2]
 
-    def visible(i: int) -> bool:
-        x, y, c = kps[i]
-        return (c >= min_conf) and (0 <= x < w) and (0 <= y < h)
+    # Convert normalized landmarks -> pixel coords
+    pts = []
+    vis = []
+    for lm in landmarks:
+        x_px = int(lm.x * w)
+        y_px = int(lm.y * h)
+        pts.append((x_px, y_px))
+        # Some models provide visibility; if not, default to 1.0
+        v = getattr(lm, "visibility", 1.0)
+        vis.append(float(v))
 
-    def pt(i: int) -> Tuple[int, int]:
-        x, y, _ = kps[i]
-        return int(x), int(y)
+    # Draw skeleton lines first
+    for a, b in POSE_CONNECTIONS:
+        if vis[a] >= min_visibility and vis[b] >= min_visibility:
+            cv2.line(frame_bgr, pts[a], pts[b], (255, 255, 255), 2, lineType=cv2.LINE_AA)
 
-    # 1) Draw limbs (lines) first
-    for a, b in SKELETON:
-        ia, ib = IDX[a], IDX[b]
-        if visible(ia) and visible(ib):
-            cv2.line(frame, pt(ia), pt(ib), (255, 255, 255), 2, lineType=cv2.LINE_AA)
+    # Draw joints on top
+    for i, (p, v) in enumerate(zip(pts, vis)):
+        if v >= min_visibility:
+            cv2.circle(frame_bgr, p, 4, (0, 255, 0), -1, lineType=cv2.LINE_AA)
 
-    # 2) Draw joints (circles) on top
-    for name in JOINTS:
-        i = IDX[name]
-        if visible(i):
-            cv2.circle(frame, pt(i), 5, (0, 255, 0), -1, lineType=cv2.LINE_AA)
-            if draw_names:
-                x, y = pt(i)
-                cv2.putText(
-                    frame,
-                    name,
-                    (x + 8, y - 8),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.4,
-                    (255, 255, 255),
-                    1,
-                    lineType=cv2.LINE_AA,
-                )
-
-    return frame
+    return frame_bgr
