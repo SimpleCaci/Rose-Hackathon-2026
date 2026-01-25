@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yoga Pose Detector</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🧘 Yoga Pose Detector</h1>
+        
+        <div class="content-wrapper">
+            <!-- Left Sidebar - Accuracy -->
+            <div class="accuracy-sidebar">
+                <div class="accuracy-display">
+                    <div id="accuracy">0%</div>
+                    <div class="accuracy-label">Pose Accuracy</div>
+                </div>
+            </div>
+            
+            <!-- Center - Video and Controls -->
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="webcam" autoplay playsinline></video>
+                    <canvas id="canvas"></canvas>
+                </div>
+
+                <div class="controls">
+                    <button id="calibrateButton" disabled>Calibrate (T-Pose)</button>
+                    <select id="poseSelect">
+                        <option value="tree">Tree Pose</option>
+                        <option value="warrior">Warrior II Pose</option>
+                        <option value="downdog">Downward Dog</option>
+                    </select>
+                    <button id="startButton" disabled>Start Practice</button>
+                </div>
+
+                <div class="calibration-status">
+                    <p id="calibrationStatus">Please calibrate before starting</p>
+                </div>
+            </div>
+            
+            <!-- Right Sidebar - Feedback -->
+            <div class="feedback-sidebar">
+                <div class="feedback">
+                    <h2>Corrections Needed</h2>
+                    <div id="feedbackText" class="feedback-text">
+                        <div class="feedback-item">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
