@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Yoga Pose Match</title>
+
+    <style>
+      :root{
+        /* soft, solid pink palette */
+        --bg: #fde7f2;
+        --panel: #ffffff;
+        --panel2: #fff7fb;
+        --border: #f3c6dd;
+        --text: #3a2130;
+        --muted: #6b3f56;
+        --accent: #f49ac2;
+        --accent2: #f7b7d6;
+        --ok: #2e7d5b;
+        --warn: #8a5b2a;
+      }
+
+      html, body {
+        height: 100%;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      }
+
+      .wrap {
+        height: 100%;
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 180px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      .title {
+        font-weight: 800;
+        letter-spacing: 0.2px;
+      }
+
+      .hud {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: center;
+        flex: 1;
+      }
+
+      .pill {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        padding: 8px 10px;
+        border-radius: 999px;
+        font-size: 14px;
+        line-height: 1;
+        color: var(--muted);
+        transition: background 140ms ease, transform 140ms ease, border-color 140ms ease;
+      }
+
+      .pill:hover {
+        background: #ffffff;
+        border-color: #efb6d4;
+        transform: translateY(-1px);
+      }
+
+      .pill strong {
+        color: var(--text);
+        font-weight: 800;
+        margin-right: 6px;
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        min-width: 180px;
+        justify-content: flex-end;
+      }
+
+      button {
+        background: var(--accent);
+        border: 1px solid #ef86b7;
+        color: #ffffff;
+        padding: 10px 14px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 800;
+        transition: transform 140ms ease, background 140ms ease, filter 140ms ease;
+      }
+
+      button:hover {
+        background: #ef86b7;
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0px);
+        filter: brightness(0.98);
+      }
+
+      button:focus-visible {
+        outline: 3px solid rgba(244, 154, 194, 0.45);
+        outline-offset: 3px;
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      main {
+        display: grid;
+        place-items: center;
+        padding: 18px;
+      }
+
+      .stage {
+        position: relative;
+        width: min(980px, 96vw);
+        aspect-ratio: 16 / 9;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        overflow: hidden;
+      }
+
+      video, canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      video {
+        transform: scaleX(-1); /* selfie mirror */
+      }
+
+      .hint {
+        width: min(980px, 96vw);
+        margin: 12px 0 0;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--muted);
+        transition: transform 140ms ease, border-color 140ms ease;
+      }
+
+      .hint:hover {
+        transform: translateY(-1px);
+        border-color: #efb6d4;
+      }
+
+      .hint strong { color: var(--text); }
+
+      .sr-only {
+        position:absolute;
+        width:1px;
+        height:1px;
+        padding:0;
+        margin:-1px;
+        overflow:hidden;
+        clip:rect(0,0,0,0);
+        white-space:nowrap;
+        border:0;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <header>
+        <div class="brand" aria-label="Yoga Pose Match">
+          <span class="dot" aria-hidden="true"></span>
+          <div class="title">Yoga Pose Match</div>
+        </div>
+
+        <div class="hud" role="status" aria-live="polite" aria-atomic="true">
+          <div class="pill" id="poseName"><strong>Pose</strong>—</div>
+          <div class="pill" id="scorePill"><strong>Score</strong>0</div>
+          <div class="pill" id="streakPill"><strong>Streak</strong>0</div>
+          <div class="pill" id="statusPill"><strong>Status</strong>ready</div>
+        </div>
+
+        <div class="controls">
+          <button id="startBtn">Start</button>
+          <button id="nextBtn" class="sr-only" disabled aria-hidden="true" tabindex="-1">Next</button>
+        </div>
+      </header>
+
+      <main>
+        <div class="stage" aria-label="Camera with pose overlay">
+          <video id="video" playsinline></video>
+          <canvas id="overlay"></canvas>
+        </div>
+
+        <div class="hint" id="hint">
+          <strong>Tip:</strong> Press Start, allow camera, then match the pink silhouette.
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="/web/script.js"></script>
+  </body>
+</html>
