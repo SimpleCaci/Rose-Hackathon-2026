@@ -1,6 +1,7 @@
 # main.py
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -18,11 +19,16 @@ app = FastAPI(title="FastAPI Website Boilerplate")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+mp_pose = mp.solutions.pose
+mp_drawing = mp.solutions.drawing_utils
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "title": "Home"})
+<<<<<<< HEAD
 
+=======
+>>>>>>> 8777ac371c1b37d264d214a281ed1c8859cf8f7f
 
 @app.get("/health")
 def health():
