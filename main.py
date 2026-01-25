@@ -11,6 +11,8 @@ import threading
 import time
 import numpy as np
 
+import mediapipe as mp
+
 # ✅ Import your overlay drawer
 from pose_overlay import draw_pose_on_frame, IDX
 
