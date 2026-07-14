@@ -16,6 +16,7 @@ const poseNameEl = document.getElementById("poseName");
 const scoreEl = document.getElementById("scorePill");
 const streakEl = document.getElementById("streakPill");
 const statusEl = document.getElementById("statusPill");
+const coachEl = document.getElementById("coachPill");
 const hintEl = document.getElementById("hint");
 
 const { FilesetResolver, PoseLandmarker } = vision;
@@ -241,11 +242,38 @@ function sizeGuidance(lms) {
   return null;
 }
 
-function friendlyHint(pct) {
-  if (pct < 0.25) return "Face the camera and keep your body in the frame.";
-  if (pct < 0.50) return "Nice start—move slowly and match the target card.";
-  if (pct < 0.70) return "Almost—tiny adjustments now.";
-  return "Hold steady—you're very close.";
+function coachingCue(worst) {
+  if (!worst) {
+    return {
+      area: "full body",
+      instruction: "Face the camera and match the target silhouette.",
+    };
+  }
+
+  const area = worst.k.replaceAll("_", " ");
+  const needsLargerAngle = worst.actual < worst.target;
+  let action;
+
+  if (worst.k.includes("elbow") || worst.k.includes("knee")) {
+    action = needsLargerAngle ? "Straighten" : "Bend";
+  } else {
+    action = needsLargerAngle ? "Open" : "Bring in";
+  }
+
+  return {
+    area,
+    instruction: `${action} your ${area} a little, then hold steady.`,
+  };
+}
+
+function friendlyHint(pct, worst) {
+  if (pct < 0.25) return "Start with your full-body outline, then " + coachingCue(worst).instruction.toLowerCase();
+  return coachingCue(worst).instruction;
+}
+
+function updateCoach(worst) {
+  const cue = coachingCue(worst);
+  coachEl.innerHTML = `<strong>Focus</strong>${cue.area}`;
 }
 
 // -------------------- SCORING (more tolerant) --------------------
@@ -261,7 +289,7 @@ function scorePose(angles, target, tol) {
     const allowance = (tol?.[k] ?? 20) + TOLERANCE_BOOST_DEG;
 
     const d = Math.abs(a - t);
-    diffs.push({ k, d, ok: d <= allowance, allowance });
+    diffs.push({ k, d, ok: d <= allowance, allowance, actual: a, target: t });
   }
   if (!diffs.length) return { pass: false, pct: 0, worst: null };
   const okCount = diffs.filter(x => x.ok).length;
@@ -505,6 +533,7 @@ async function loadPoses() {
 async function setupCamera() {
   statusEl.textContent = "Status: camera";
   hintEl.textContent = "Allow camera access. Then step into the frame.";
+  updateCoach(null);
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
     audio: false,
@@ -548,6 +577,7 @@ function setActivePose(i) {
   freezeUntil = performance.now() + 250;
 
   hintEl.textContent = "Match the target card (top-left). Move slowly. Hold still to win.";
+  updateCoach(null);
 }
 
 function advancePose() {
@@ -563,6 +593,7 @@ function markSuccess() {
 
   statusEl.textContent = "Status: success";
   hintEl.textContent = "Sweet! Next pose…";
+  coachEl.innerHTML = "<strong>Focus</strong>matched";
 
   successSound();
 
@@ -601,6 +632,7 @@ function loop() {
   if (!bestRaw) {
     statusEl.textContent = "Status: find you";
     hintEl.textContent = "Step into view. Face the camera. Good lighting helps.";
+    updateCoach(null);
     drawCenterToast("Step into the frame", w, h);
 
     countdownStart = null;
@@ -625,6 +657,7 @@ function loop() {
   if (guide) {
     statusEl.textContent = "Status: adjust";
     hintEl.textContent = guide;
+    coachEl.innerHTML = "<strong>Focus</strong>framing";
   }
 
   // score
@@ -645,6 +678,7 @@ function loop() {
       countdownStart = now;
       statusEl.textContent = "Status: almost";
       hintEl.textContent = "Perfect! Stay still…";
+      coachEl.innerHTML = "<strong>Focus</strong>hold steady";
     }
 
     if (countdownStart != null) {
@@ -677,7 +711,8 @@ function loop() {
 
     const pctText = Math.round(pct * 100);
     statusEl.textContent = `Status: ${pctText}%`;
-    hintEl.textContent = friendlyHint(pct);
+    updateCoach(scored.worst);
+    hintEl.textContent = friendlyHint(pct, scored.worst);
     drawHoldUI("none", 0, w, h);
   }
 
