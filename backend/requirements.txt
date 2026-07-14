@@ -1,6 +1,3 @@
-flask
-opencv-python
-mediapipe
-numpy
 fastapi[standard]
 uvicorn[standard]
+pandas
