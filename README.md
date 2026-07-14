@@ -12,6 +12,7 @@ Built for Rose Hackathon 2026, Yoga Pose Match turns pose estimation into a frie
 - MediaPipe pose detection running in the browser
 - angle-based matching with per-pose targets and tolerances
 - friendly distance, alignment, countdown, and hold feedback
+- joint-specific coaching that names the area furthest from its target angle
 - score and streak progression
 - multi-person detection that selects the clearest visible subject
 - generated pose definitions from training CSV statistics
@@ -37,7 +38,7 @@ browser camera --> MediaPipe landmarks --> joint angles
                                      |
                            target/tolerance scoring
                                      |
-                      live coaching, score, and streak
+                      joint-specific coaching, score, and streak
 ```
 
 The server in `backend/main.py` serves `web/index.html` and exposes `/api/poses`. Pose inference runs client-side; camera frames are not uploaded to the Python server.
@@ -91,7 +92,7 @@ The interface still needs keyboard, reduced-motion, screen-reader, and mobile ca
 
 ## Validation
 
-No automated test suite or CI workflow currently exists. Before presenting the project as production-ready, verify:
+The Python backend compiles and the browser module is syntax-checked during maintenance. Camera behavior still requires a real-device check before presenting the project as production-ready:
 
 - API startup and `/api/poses`
 - camera permission denial and recovery
@@ -112,7 +113,7 @@ No automated test suite or CI workflow currently exists. Before presenting the p
 
 - add schema validation and tests for pose definitions
 - add a calibration mode before scoring starts
-- provide a visible target illustration for every supported pose
+- add tests around scoring tolerance and coaching direction
 - add pause, skip, and camera-retry controls
 - test reduced-motion and keyboard-only operation
 - capture a privacy-safe demo
