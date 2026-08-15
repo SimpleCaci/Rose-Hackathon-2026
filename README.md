@@ -22,6 +22,10 @@ Built for Rose Hackathon 2026, Yoga Pose Match turns pose estimation into a frie
 
 A current gameplay screenshot or short recording is still needed. Because the app uses a camera, the README intentionally does not include personal test footage.
 
+<img src="docs/media/project-visual.png" width="320" alt="Illustrative visual of camera-based yoga pose landmarks">
+
+*Illustrative project visual—not a runtime screenshot.*
+
 ## Technology
 
 - JavaScript, Canvas, and MediaPipe Tasks Vision
