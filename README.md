@@ -92,7 +92,13 @@ The interface still needs keyboard, reduced-motion, screen-reader, and mobile ca
 
 ## Validation
 
-The Python backend compiles and the browser module is syntax-checked during maintenance. Camera behavior still requires a real-device check before presenting the project as production-ready:
+Deterministic tests cover pose-label parsing, grouped target generation, tolerance bounds, and invalid input schemas:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+GitHub Actions runs the tests and compiles the Python modules on every push and pull request. Camera behavior still requires a real-device check before presenting the project as production-ready:
 
 - API startup and `/api/poses`
 - camera permission denial and recovery
@@ -111,7 +117,6 @@ The Python backend compiles and the browser module is syntax-checked during main
 
 ## Roadmap
 
-- add schema validation and tests for pose definitions
 - add a calibration mode before scoring starts
 - add tests around scoring tolerance and coaching direction
 - add pause, skip, and camera-retry controls

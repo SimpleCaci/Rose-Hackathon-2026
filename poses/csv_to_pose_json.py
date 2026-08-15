@@ -80,11 +80,20 @@ def build_pose_json(
     decimals: int,
     include_template_landmarks: bool,
 ) -> Dict[str, Any]:
+    if label_col not in df.columns:
+        raise ValueError(f"Label column not found: {label_col}")
+    if hold_ms <= 0:
+        raise ValueError("hold_ms must be positive")
+    if points <= 0:
+        raise ValueError("points must be positive")
+
     # Ensure label is string
     df[label_col] = df[label_col].astype(str)
 
     # All non-label columns treated as numeric angles
     angle_cols = [c for c in df.columns if c != label_col]
+    if not angle_cols:
+        raise ValueError("At least one angle column is required")
 
     # Coerce numeric
     for c in angle_cols:
