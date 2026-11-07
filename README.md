@@ -2,6 +2,14 @@
 
 A browser-based yoga pose game that uses live camera landmarks to coach users through a sequence of poses.
 
+[![Checks](https://github.com/SimpleCaci/Rose-Hackathon-2026/actions/workflows/validate.yml/badge.svg)](https://github.com/SimpleCaci/Rose-Hackathon-2026/actions/workflows/validate.yml)
+
+[Setup](#setup) · [Run](#run) · [Pose data](#rebuild-pose-data)
+
+<img src="docs/media/project-visual.png" width="640" alt="Illustration of landmark-based yoga pose matching">
+
+*Project illustration; see the run instructions for the current prototype.*
+
 Built for Rose Hackathon 2026, Yoga Pose Match turns pose estimation into a friendly movement challenge: the user matches a target pose, receives live feedback, holds the position, and earns points and streaks.
 
 > **Status:** functional hackathon prototype. The FastAPI server and browser experience are implemented, but camera behavior and pose accuracy still require cross-device testing.
@@ -21,8 +29,6 @@ Built for Rose Hackathon 2026, Yoga Pose Match turns pose estimation into a frie
 ## Demo
 
 Camera input is processed in the browser, and no personal test footage is included in the repository.
-
-<img src="docs/media/project-visual.png" align="right" width="240" alt="Yoga pose landmark matching visual">
 
 ## Technology
 
@@ -127,4 +133,4 @@ GitHub Actions runs the tests and compiles the Python modules on every push and 
 
 ## License and authorship
 
-Created by [SimpleCaci](https://github.com/SimpleCaci) for Rose Hackathon 2026 and released under the [MIT License](LICENSE).
+Built for Rose Hackathon 2026. The commit history credits [SimpleCaci](https://github.com/SimpleCaci) and Suchitra Chinnakonda; see the [project contributors](https://github.com/SimpleCaci/Rose-Hackathon-2026/graphs/contributors). Released under the [MIT License](LICENSE).
